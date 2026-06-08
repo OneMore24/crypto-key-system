@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Demo funcional - Generación y Distribución de Claves</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f8fafc;
+    color: #1e293b;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  p.subtitle { color: #64748b; margin-top: 0; margin-bottom: 28px; }
+
+  .step {
+    display: flex;
+    gap: 16px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: 6px solid #2563eb;
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .step-number {
+    flex: 0 0 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .step-content { flex: 1; min-width: 0; }
+  .step-content h2 { font-size: 16px; margin: 0 0 6px 0; }
+  .step-content p.explain { font-size: 13px; color: #64748b; margin: 0 0 12px 0; }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  select, button, input, textarea {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  button { background: #2563eb; color: white; font-weight: 600; border: none; cursor: pointer; }
+  button:hover { background: #1d4ed8; }
+  button:disabled { background: #94a3b8; cursor: not-allowed; }
+  .result {
+    margin-top: 6px;
+    background: #f1f5f9;
+    border: 1px dashed #94a3b8;
+    border-radius: 6px;
+    padding: 10px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    color: #0f172a;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+  .badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .badge.ok { background: #dcfce7; color: #15803d; }
+  .badge.warn { background: #fee2e2; color: #b91c1c; }
+  .arrow { text-align: center; color: #94a3b8; font-size: 20px; margin: -8px 0 -8px 46px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+  th { color: #64748b; }
+  .log { background: #0f172a; color: #cbd5e1; border-radius: 6px; padding: 10px;
+         font-family: Consolas, monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+  .log div { margin-bottom: 4px; }
+  .log span.tag { color: #38bdf8; margin-right: 6px; }
+</style>
+</head>
+<body>
+
+  <h1>Sistema de Generación y Distribución de Claves Criptográficas</h1>
+  <p class="subtitle">Demo funcional — usa criptografía real del navegador (Web Crypto API: RSA-OAEP + AES-GCM). Todo ocurre en tu propio equipo, nada se envía a ningún servidor.</p>
+
+  <!-- Paso 1: Registro -->
+  <div class="step">
+    <div class="step-number">1</div>
+    <div class="step-content">
+      <h2>Registrar usuarios (genera su par de claves RSA-2048)</h2>
+      <p class="explain">Cada usuario necesita un par de claves: una <b>pública</b> (se puede compartir) y una <b>privada</b> (secreta). El sistema las genera al registrarse.</p>
+      <div class="controls">
+        <input id="username" placeholder="Nombre de usuario" maxlength="20">
+        <button id="btnRegister">Registrar y generar claves</button>
+        <span id="registerStatus"></span>
+      </div>
+      <table id="usersTable">
+        <tr><th>Usuario</th><th>Huella de su clave pública (SHA-256)</th></tr>
+      </table>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <!-- Paso 2: Elegir interlocutores -->
+  <div class="step">
+    <div class="step-number">2</div>
+    <div class="step-content">
+      <h2>Elegir quién quiere hablar con quién</h2>
+      <p class="explain">Selecciona dos usuarios ya registrados para iniciar una comunicación cifrada entre ellos.</p>
+      <div class="controls">
+        <span class="badge">Emisor</span>
+        <select id="selectSender"></select>
+        <span class="badge">Receptor</span>
+        <select id="selectReceiver"></select>
+        <button id="btnStart">Generar y distribuir clave de sesión</button>
+      </div>
+      <div id="startStatus" class="result" style="display:none;"></div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <!-- Paso 3: clave de sesión -->
+  <div class="step">
+    <div class="step-number">3</div>
+    <div class="step-content">
+      <h2>Clave de sesión generada (AES-256, simétrica)</h2>
+      <p class="explain">El sistema crea una clave simétrica nueva, temporal, solo para esta conversación. (La mostramos aquí únicamente con fines didácticos — en un sistema real nunca se expone así).</p>
+      <div id="sessionKeyResult" class="result">— Aún no se ha generado ninguna clave de sesión —</div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <!-- Paso 4: Distribución -->
+  <div class="step">
+    <div class="step-number">4</div>
+    <div class="step-content">
+      <h2>Distribución cifrada (cifrado híbrido RSA + AES)</h2>
+      <p class="explain">La clave de sesión se cifra por separado con la clave <b>pública RSA</b> de cada participante. Solo quien tenga la clave <b>privada</b> correspondiente podrá recuperarla.</p>
+      <div id="distributionResult" class="result">— Aún no se ha distribuido nada —</div>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <!-- Paso 5: Recepción y prueba -->
+  <div class="step">
+    <div class="step-number">5</div>
+    <div class="step-content">
+      <h2>Recibir, descifrar y probar la comunicación</h2>
+      <p class="explain">Cada participante usa su clave privada para recuperar la clave de sesión, y luego ambos pueden cifrar/descifrar mensajes reales con ella (AES-GCM).</p>
+      <div class="controls">
+        <button id="btnReceiveSender">Descifrar como emisor</button>
+        <button id="btnReceiveReceiver">Descifrar como receptor</button>
+      </div>
+      <div id="receiveResult" class="result">— Aún nadie ha descifrado su copia de la clave —</div>
+
+      <div class="controls" style="margin-top:14px;">
+        <input id="messageInput" placeholder="Escribe un mensaje para cifrar" style="flex:1;">
+        <button id="btnEncryptMsg">Cifrar y descifrar mensaje (prueba)</button>
+      </div>
+      <div id="messageResult" class="result">— Aún no se ha probado ningún mensaje —</div>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="step">
+    <div class="step-number">📋</div>
+    <div class="step-content">
+      <h2>Registro de actividad</h2>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+
+<script>
+// ---------- Estado de la aplicación ----------
+const users = {};       // nombre -> { keyPair: CryptoKeyPair, fingerprint: string }
+let sessionKey = null;  // CryptoKey (AES-GCM) generada en el paso 3, guardada por el "servidor"
+let sessionKeyRaw = null;
+let encryptedPackages = {}; // nombre -> ArrayBuffer cifrado con su clave pública
+let recoveredKeys = {};     // nombre -> CryptoKey recuperada al "descifrar"
+
+// ---------- Utilidades ----------
+function logEvent(text, kind) {
+  const log = document.getElementById('log');
+  const div = document.createElement('div');
+  const time = new Date().toLocaleTimeString();
+  div.innerHTML = `<span class="tag">[${time}]</span>${text}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function buf2hex(buffer) {
+  return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function buf2b64(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+}
+
+function b642buf(b64) {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+}
+
+async function fingerprintOf(publicKey) {
+  const spki = await crypto.subtle.exportKey('spki', publicKey);
+  const hash = await crypto.subtle.digest('SHA-256', spki);
+  return buf2hex(hash).slice(0, 32) + '...';
+}
+
+function refreshUserSelectors() {
+  const names = Object.keys(users);
+  for (const id of ['selectSender', 'selectReceiver']) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = '';
+    for (const name of names) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    }
+  }
+}
+
+// ---------- Paso 1: registrar usuario y generar par RSA ----------
+document.getElementById('btnRegister').addEventListener('click', async () => {
+  const input = document.getElementById('username');
+  const name = input.value.trim();
+  const status = document.getElementById('registerStatus');
+  if (!name) { status.innerHTML = '<span class="badge warn">escribe un nombre</span>'; return; }
+  if (users[name]) { status.innerHTML = '<span class="badge warn">ese usuario ya existe</span>'; return; }
+
+  status.innerHTML = '<span class="badge">generando claves RSA-2048...</span>';
+  const keyPair = await crypto.subtle.generateKey(
+    { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true,
+    ['encrypt', 'decrypt']
+  );
+  const fingerprint = await fingerprintOf(keyPair.publicKey);
+  users[name] = { keyPair, fingerprint };
+
+  const table = document.getElementById('usersTable');
+  const row = table.insertRow();
+  row.insertCell(0).textContent = name;
+  row.insertCell(1).textContent = fingerprint;
+
+  status.innerHTML = '<span class="badge ok">registrado</span>';
+  input.value = '';
+  refreshUserSelectors();
+  logEvent(`Usuario <b>${name}</b> registrado — par de claves RSA-2048 generado (huella pública: ${fingerprint})`);
+});
+
+// ---------- Paso 2 + 3: generar clave de sesión ----------
+document.getElementById('btnStart').addEventListener('click', async () => {
+  const sender = document.getElementById('selectSender').value;
+  const receiver = document.getElementById('selectReceiver').value;
+  const startStatus = document.getElementById('startStatus');
+  startStatus.style.display = 'block';
+
+  if (!sender || !receiver) {
+    startStatus.textContent = 'Necesitas al menos dos usuarios registrados.';
+    return;
+  }
+  if (sender === receiver) {
+    startStatus.textContent = 'Elige dos usuarios distintos.';
+    return;
+  }
+
+  startStatus.textContent = `Iniciando comunicación segura entre "${sender}" y "${receiver}"...`;
+  logEvent(`Se solicita comunicación segura entre <b>${sender}</b> y <b>${receiver}</b>`);
+
+  // Generar clave simétrica AES-256 (clave de sesión)
+  sessionKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  sessionKeyRaw = await crypto.subtle.exportKey('raw', sessionKey);
+
+  document.getElementById('sessionKeyResult').textContent =
+    `Clave de sesión AES-256 (formato hexadecimal, solo para fines didácticos):\n${buf2hex(sessionKeyRaw)}`;
+  logEvent(`Servidor generó una nueva clave de sesión AES-256 para esta conversación`);
+
+  // Cifrar la clave de sesión con la clave pública RSA de cada participante
+  encryptedPackages = {};
+  recoveredKeys = {};
+  for (const name of [sender, receiver]) {
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'RSA-OAEP' },
+      users[name].keyPair.publicKey,
+      sessionKeyRaw
+    );
+    encryptedPackages[name] = encrypted;
+  }
+
+  document.getElementById('distributionResult').textContent =
+`Paquete para "${sender}" (cifrado con su clave pública RSA):
+${buf2b64(encryptedPackages[sender])}
+
+Paquete para "${receiver}" (cifrado con su clave pública RSA):
+${buf2b64(encryptedPackages[receiver])}`;
+
+  logEvent(`Clave de sesión cifrada por separado con la clave pública de <b>${sender}</b> y de <b>${receiver}</b>, y enviada a cada uno`);
+
+  // Reset de los pasos siguientes
+  document.getElementById('receiveResult').textContent = '— Aún nadie ha descifrado su copia de la clave —';
+  document.getElementById('messageResult').textContent = '— Aún no se ha probado ningún mensaje —';
+
+  // Configurar los botones del paso 5 para este par concreto
+  document.getElementById('btnReceiveSender').onclick = () => receiveAs(sender);
+  document.getElementById('btnReceiveReceiver').onclick = () => receiveAs(receiver);
+  document.getElementById('btnReceiveSender').textContent = `Descifrar como "${sender}"`;
+  document.getElementById('btnReceiveReceiver').textContent = `Descifrar como "${receiver}"`;
+
+  startStatus.textContent = `Listo. La clave de sesión fue generada y distribuida cifrada a "${sender}" y "${receiver}".`;
+});
+
+// ---------- Paso 5a: descifrar la clave de sesión con la clave privada ----------
+async function receiveAs(name) {
+  const result = document.getElementById('receiveResult');
+  if (!encryptedPackages[name]) { result.textContent = 'Primero genera y distribuye una clave de sesión.'; return; }
+
+  const decryptedRaw = await crypto.subtle.decrypt(
+    { name: 'RSA-OAEP' },
+    users[name].keyPair.privateKey,
+    encryptedPackages[name]
+  );
+  const recoveredKey = await crypto.subtle.importKey('raw', decryptedRaw, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+  recoveredKeys[name] = recoveredKey;
+
+  const matches = buf2hex(decryptedRaw) === buf2hex(sessionKeyRaw);
+  result.textContent =
+`"${name}" descifró su paquete con su clave privada y recuperó:
+${buf2hex(decryptedRaw)}
+
+¿Coincide con la clave de sesión original? ${matches ? 'SÍ ✓' : 'NO ✗'}`;
+
+  logEvent(`<b>${name}</b> descifró su copia con su clave privada y recuperó la clave de sesión correctamente`);
+}
+
+// ---------- Paso 5b: probar la comunicación cifrando/descifrando un mensaje ----------
+document.getElementById('btnEncryptMsg').addEventListener('click', async () => {
+  const result = document.getElementById('messageResult');
+  const names = Object.keys(recoveredKeys);
+  if (names.length < 2) {
+    result.textContent = 'Primero haz que ambos participantes descifren su copia de la clave de sesión (paso 5).';
+    return;
+  }
+  const [a, b] = names;
+  const text = document.getElementById('messageInput').value || '(mensaje vacío)';
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  // "a" cifra con su copia recuperada de la clave de sesión
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, recoveredKeys[a], encoder.encode(text));
+
+  // "b" descifra con su propia copia recuperada (debe ser la misma clave)
+  const plaintextBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, recoveredKeys[b], ciphertext);
+  const plaintext = decoder.decode(plaintextBuf);
+
+  result.textContent =
+`"${a}" cifra: "${text}"
+   → texto cifrado (base64): ${buf2b64(ciphertext)}
+
+"${b}" descifra el mensaje con su copia de la clave de sesión:
+   → texto recuperado: "${plaintext}"
+
+${plaintext === text ? 'La comunicación cifrada funciona correctamente ✓' : 'Algo falló ✗'}`;
+
+  logEvent(`Mensaje de prueba cifrado por <b>${a}</b> y descifrado correctamente por <b>${b}</b> usando la clave de sesión compartida`);
+});
+
+// ---------- Aviso si Web Crypto no está disponible ----------
+if (!window.crypto || !window.crypto.subtle) {
+  document.body.innerHTML = '<h1>Web Crypto API no disponible</h1>' +
+    '<p>Tu navegador no permite usar <code>crypto.subtle</code> en este contexto. ' +
+    'Prueba a abrir este archivo con un servidor local (por ejemplo <code>python -m http.server</code>) ' +
+    'y accede a través de <code>http://localhost</code>.</p>';
+}
+</script>
+
+</body>
+</html>
